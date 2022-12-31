@@ -1,14 +1,18 @@
 
+/**
+ *  Used authorization code flow modified from https://github.com/spotify/web-api-auth-examples
+ */
 
-//Get required node modules
+
+//Required node modules
 const express = require('express'); // Express web server framework
 const request = require('request'); // "Request" library
 const cors = require('cors');
 const querystring = require('querystring');
 const cookieParser = require('cookie-parser');
 
-var client_id = '3956675b5bb54b899834683f1ce57a98'; // Your client id 
-var client_secret = ''; // Your secret
+var client_id = 'CLIENT_ID'; // Change to your client id
+var client_secret = 'CLIENT_SECRET'; // Change to your client secret
 var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri 
 
 /**
@@ -27,22 +31,26 @@ var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
   };
 
 
+
+
+
 var stateKey = 'spotify_auth_state';
 
-var app = express(); //generate new app
+var app = express(); 
 
 var access_token = null;
 var refresh_token = null;
 
-//use these libraries
+//Add modules to app
 app.use(express.static(__dirname + '/public')) 
    .use(cors())
    .use(cookieParser());
 
 
+
 app.get('/login', function(req, res){
-    //This code when we request a login 
-    //need to send a GET API call to spotify auth api
+    //This code runs when we receive a login request
+    //need to send a GET request to Spotify Authorization API
 
     //add a cookie to our request
     var state = generateRandomString(16);
@@ -53,7 +61,7 @@ app.get('/login', function(req, res){
     var scope = 'user-read-playback-state playlist-modify-private playlist-modify-public';
 
 
-    //forward this api call to Spotify
+    //send link to Spotify Authorization back to client
     res.redirect('https://accounts.spotify.com/authorize?' +
     querystring.stringify({
       response_type: 'code',
@@ -67,7 +75,8 @@ app.get('/login', function(req, res){
 
 
 app.get('/callback', function(req, res){
-    //Spotify sends back a call with code and state
+    //This code runs when we receive a callback request (what Spotify redirects to after authorization)
+    //Spotify redirects providing a code and state
 
     var code = req.query.code || null;
     var state = req.query.state || null;
@@ -97,10 +106,11 @@ app.get('/callback', function(req, res){
             json: true
         };
 
+        //Send POST request to Spotify Authorization API for tokens
         request.post(authRequest, function(error, response, body){
             if(!error && response.statusCode === 200){ //if request was successful
 
-                console.log("access token retrieved");
+                console.log("Access Token Retrieved");
                 //get access and refresh tokens
                 access_token = body.access_token,
                 refresh_token = body.refresh_token;
@@ -108,30 +118,6 @@ app.get('/callback', function(req, res){
                 module.exports.access_token = access_token;
                 module.exports.refresh_token = refresh_token;
 
-                
-
-                /*
-                var accessRequest = {
-                    url: 'https://api.spotify.com/v1/me/player',
-                    headers: { 'Authorization': 'Bearer ' + access_token },
-                    json: true
-                }
-
-                //make a API call to get the desired data
-                request.get(accessRequest, function(error, response, body){
-
-                    console.log(body.item.name);
-                });
-                
-
-
-                //redirect to the browser passing the access and refresh tokens as queries
-                res.redirect('/#' +
-                querystring.stringify({
-                    access_token: access_token,
-                    refresh_token: refresh_token
-                }));
-                */
             } else {
                 res.redirect('/#' + 
                 querystring.stringify({
@@ -164,7 +150,7 @@ app.get('/refresh_token', function(req, res){
     request.post(authOptions, function(error, response, body) {
     if (!error && response.statusCode === 200) {
         var access_token = body.access_token;
-        res.send({ //What does this do?
+        res.send({ 
         'access_token': access_token
         });
     }

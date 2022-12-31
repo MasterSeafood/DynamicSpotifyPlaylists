@@ -1,13 +1,16 @@
 
+
+//Require node modules
 const auth = require('./auth');
-// const express = require('express'); // Express web server framework
 const request = require('request'); // "Request" library
-const https = require('https');
-const querystring = require('querystring');
-const axios = require('axios');
+
+
+var dynplaylistID = 'PlAYLIST_ID';
+var skipCountThreshold = 1;
+var targetPlaylistSize = 20;
+
 
 var playlistID = null;
-var dynplaylistID = '14SsYXXLTLIbYH7hklNKYR';
 
 var songDuration = null,
     songProgress = null,
@@ -20,12 +23,14 @@ var hasRetrievedDynPlaylist = false;
 var skipMap = new Map();
 
 
-//get a random item from Map
+
+//function to get a random key from a Map
 function getRandomKey(map) {
     let items = Array.from(map.keys());
     return items[Math.floor(Math.random() * items.length)];
 }
 
+//function to add a song to a playlist
 function addSong(playlistID, songID){
     var dataRequest = {
         url: 'https://api.spotify.com/v1/playlists/'+playlistID+'/tracks',
@@ -39,19 +44,18 @@ function addSong(playlistID, songID){
 
     request.post(dataRequest, function(error, response, body){
         if(!error && response.statusCode === 201){
-            console.log("successfully added song");
+            console.log("Successfully added song");
 
         }else{
-            console.log("failed to add song");
-            console.log(response.statusCode);
-            console.log(error);
-            console.log(body);
+            console.log("Failed to add song");
+
         }
     });
 
 
 }
 
+//function to add a similar song to a playlist
 function addRecommendedSong(playlistID, songID){
     var dataRequest = {
         url: 'https://api.spotify.com/v1/recommendations',
@@ -68,24 +72,21 @@ function addRecommendedSong(playlistID, songID){
 
     request.get(dataRequest, function(error, response, body){
         if(!error && response.statusCode === 200){
-            console.log("successfully retrieved recommendation");
-            // console.log(body.tracks[0].name);
-            // console.log(body.tracks[0].id);
+            console.log("Successfully retrieved recommendation");
 
+            //Get recommended song and add to playlist and skipMap
             addSong(playlistID, body.tracks[0].id);
             skipMap.set(body.tracks[0].id, 0);
             
         }else{
-            console.log("failed to retrieve recommendation");
-            console.log(response.statusCode);
-            console.log(error);
-            console.log(body);
+            console.log("Failed to retrieve recommendation");
+
         }
     });
 }
 
 
-
+//Function to get songs from playlist and store in skipMap
 function scrapePlaylist(endpoint){
 
     if(!endpoint){
@@ -101,21 +102,22 @@ function scrapePlaylist(endpoint){
     request.get(dataRequest, function(error, response, body){
         if(!error && response.statusCode === 200){
 
-            console.log("retrieved some songs");
-            //copy song ids into map
+            console.log("Retrieved some songs");
+
+            //copy list of song ids into skipMap
             for(let song of body.items){
                 skipMap.set(song.track.id, 0);
             }
 
+            //Recursively scrape next set of songs 
             scrapePlaylist(body.next);
                 
             
                 
 
         }else{
-            console.log("playlist songs request");
-            console.log(error);
-            console.log(response.statusCode);
+            console.log("Failed to retrieve songs from playlist");
+
             return;
         }
     });
@@ -124,49 +126,10 @@ function scrapePlaylist(endpoint){
 
 }
 
-
+//Function to remove a song from a playlist
 function removeSong(playlistID, songID){
 
-    // var payload = JSON.stringify({
-    //     'tracks': [{'uri':'spotify:track:'+songID}]
-    // });
-
-    // const options = {
-    //     hostname: 'api.spotify.com',
-    //     // port: 443,
-    //     path: '/v1/playlists/' + playlistID+'/tracks',
-    //     method: 'DELETE',
-    //     headers: {
-    //         'Content-Type': 'application/json',
-    //         'Authorization': 'Bearer ' + auth.access_token
-    //         // 'X-Auth-Token': authenticationToken
-    //     }
-    // };
-
-    // const req = https.request(options, res => {
-    //     console.log(res);
-    //     console.log(`statusCode: ${res.statusCode}`);
-
-    //     // res.on('data', d => {
-    //     //     process.stdout.write(d);
-    //     // });
-    // });
-    // req.write(payload);
-    // req.on('error', (e) => {
-    //     console.error(e);
-    //   });
-    // req.end();
-
-
-    // axios.delete('https://api.spotify.com/v1/playlists/'+playlistID+'/tracks', {
-    //     headers: { 'Authorization': 'Bearer ' + auth.access_token },
-    //     data: {
-    //         tracks: [{'uri':'spotify:track:'+songID}]
-    //     }
-
-    // }).then(
-    //     function() {console.log("deleted it")}
-    // );
+    
     var removeRequest = {
         url: 'https://api.spotify.com/v1/playlists/'+playlistID+'/tracks',
         headers: { 'Authorization': 'Bearer ' + auth.access_token
@@ -186,12 +149,10 @@ function removeSong(playlistID, songID){
 
     request.delete(removeRequest, function(error, response, body){
         if(!error && response.statusCode === 200){
-            console.log("successfully removed track");
+            console.log("Successfully removed track");
         }else{
-            console.log("error when removing track");
-            console.log(response.statusCode);
-            console.log(error);
-            console.log(body);
+            console.log("Failed to remove track");
+
         }
 
 
@@ -202,102 +163,63 @@ function removeSong(playlistID, songID){
 }
 
 
-
+//Function that runs every 1 second
 var listener = setInterval(function(){
 
     if(auth.access_token){ //if access token exists
 
-        // console.log(auth.access_token);
-
-        if(!hasRetrievedDynPlaylist){
+        if(!hasRetrievedDynPlaylist){ //First time retrieving playlist tracks
 
             scrapePlaylist('https://api.spotify.com/v1/playlists/'+dynplaylistID+'/tracks');
 
-            
-
-            // var playListSongRequest = {
-            //     url: 'https://api.spotify.com/v1/playlists/'+dynplaylistID+'/tracks',
-            //     headers: { 'Authorization': 'Bearer ' + auth.access_token },
-            //     json: true
-
-            // }
-
-            // request.get(playListSongRequest, function(error, response, body){
-            //     if(!error && response.statusCode === 200){
-
-                    
-            //         for(let song of body.items){
-            //             skipMap.set(song.track.id, 0);
-            //         }
-            //         console.log(body);
-
-
-
-
-
-
-
-
-            //     }else{
-            //         console.log("playlist songs request");
-            //         console.log(error);
-            //         console.log(response.statusCode);
-            //     }
-            // });
 
             hasRetrievedDynPlaylist = true;
         }
-            // console.log(skipMap.size);
-
-            // for(const i of skipMap.entries()){
-            //     console.log(i);
-            // }
 
 
-
+        //Get currently playing playlist 
         var dataRequest = {
             url: 'https://api.spotify.com/v1/me/player',
             headers: { 'Authorization': 'Bearer ' + auth.access_token },
             json: true
         }
-        // console.log(auth.access_token);
-        request.get(dataRequest, function(error, response, body){
 
+        request.get(dataRequest, function(error, response, body){
             if(!error && response.statusCode === 200){
 
+                //Get playlist ID 
                 playlistID = body.context.external_urls.spotify.slice(34, 56);
 
-                if(playlistID == dynplaylistID){
+                if(playlistID == dynplaylistID){ 
                     //Playing a dynamic playlist
 
                     if(isSessionActive){ //if session is already active
                         if(body.item.id != songID && songProgress <= songDuration/2){ //if detected skip event
-                            console.log("skipped");
+                            console.log("Skipped");
                             var skipCount = skipMap.get(songID);
-                            skipMap.set(songID, ++skipCount);
+                            skipMap.set(songID, ++skipCount); //update skip count
 
-                            if(skipCount>=1){
+                            if(skipCount>=skipCountThreshold){ //Need to remove a song
+
                                 removeSong(dynplaylistID, songID);
                                 skipMap.delete(songID);
 
-                                if(skipMap.size < 20){
+                                if(skipMap.size < targetPlaylistSize){ //If below target size, add a similar song
                                     addRecommendedSong(dynplaylistID, getRandomKey(skipMap));
                                 }
 
-                                
-
-                                // console.log(getRandomKey(skipMap));
+                        
 
 
                             }
                         }
 
-                    }else{
+                    }else{ //Session is not active yet
                         isSessionActive = true;
                     }
 
 
-                    //get updated data
+                    //update data
                     songID = body.item.id;
                     songProgress = body.progress_ms;
                     songDuration = body.item.duration_ms;
@@ -307,14 +229,12 @@ var listener = setInterval(function(){
 
 
                 }else{
-                    console.log("Not playing a dynamic playlist");
                     isSessionActive = false;
                 }
 
             }else{
-                console.log('playlist ID request');
-                console.log(error);
-                console.log(response.statusCode);
+                console.log('Failed to get currently playing playlist');
+
             }
             
 
@@ -324,23 +244,6 @@ var listener = setInterval(function(){
 
         });
 
-        // if(playlistID && playlistID == dynplaylistID){
-        //     //Playing a dynamic playlist
-            
-
-        //     // console.log(true);
-
-        // }else{
-        //     // console.log(false);
-        //     console.log("Not playing a dynamic playlist");
-        // }
-
-        // console.log(songID);
-        // console.log(songProgress + " / " + songDuration);
-
-
-        
-        
 
 
     }
